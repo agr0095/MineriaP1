@@ -22,8 +22,10 @@
 package weka.classifiers.rules;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Enumeration;
 import java.util.List;
+import java.util.Vector;
 
 import weka.classifiers.AbstractClassifier;
 import weka.classifiers.Sourcable;
@@ -32,6 +34,8 @@ import weka.core.Capabilities;
 import weka.core.Capabilities.Capability;
 import weka.core.Instance;
 import weka.core.Instances;
+import weka.core.Option;
+import weka.core.OptionHandler;
 import weka.core.RevisionUtils;
 import weka.core.Utils;
 import weka.core.WeightedInstancesHandler;
@@ -57,7 +61,7 @@ import weka.core.WeightedInstancesHandler;
  * @version $Revision: 10153 $
  */
 public class ZeroRPracticas extends AbstractClassifier implements
-		WeightedInstancesHandler, Sourcable {
+		WeightedInstancesHandler, Sourcable, OptionHandler {
 
 	/** for serialization */
 	static final long serialVersionUID = 48055541465867954L;
@@ -75,7 +79,7 @@ public class ZeroRPracticas extends AbstractClassifier implements
 	private List<ArrayList<Instance>> prototipos;
 
 	/** Numero de prototipos (parametro) */
-	private int numPrototipos = 1;
+	private int numPrototipos;
 
 	/**
 	 * Returns a string describing classifier
@@ -163,13 +167,78 @@ public class ZeroRPracticas extends AbstractClassifier implements
 		 */
 
 		int filas = instances.numClasses();
+		int columnas = numPrototipos;
 
-		prototipos = new ArrayList<ArrayList<Instance>>();
+		ArrayList<Integer> numProtSeleccionados = new ArrayList<Integer>(filas);
 
 		for (int i = 0; i < filas; ++i) {
-			prototipos.add(new ArrayList<Instance>());
+			numProtSeleccionados.add(0);
 		}
-		
+
+		prototipos = new ArrayList<ArrayList<Instance>>(filas);
+
+		for (int i = 0; i < filas; ++i) {
+			prototipos.add(new ArrayList<Instance>(columnas));
+		}
+
+		Enumeration<Instance> enu = instances.enumerateInstances();
+		Instance instance;
+		Attribute tipoClass;
+		// TODO
+		/* No hace falta recorrer todo el set */
+		for (int i = 0; enu.hasMoreElements(); ++i) {
+			instance = enu.nextElement();
+			tipoClass = instance.classAttribute();
+
+			/*
+			 * if (numProtSeleccionados.get(tipoClass) < numPrototipos) {
+			 * prototipos.get(tipoClass).add(instance); }
+			 */
+		}
+
+	}
+
+	public void entrenaPrototipos(Instances instances) {
+		Enumeration<Instance> enu = instances.enumerateInstances();
+		Instance instance;
+		int tipoClass;
+
+		for (int i = 0; enu.hasMoreElements(); ++i) {
+			instance = enu.nextElement();
+			tipoClass = instance.classAttribute().type();
+
+			// Calcular el prototipo mas cercano
+			double distMin = Double.MIN_VALUE;
+			double distAct;
+			Instance masCercano = null;
+
+			for (int j = 0; j < numPrototipos; ++j) {
+				distAct = distancia(prototipos.get(tipoClass).get(j), instance);
+
+				if (distAct < distMin) {
+					distMin = distAct;
+					masCercano = prototipos.get(tipoClass).get(j);
+				}
+			}
+			// TODO
+			// Comprobar si cambian los valores originales
+
+			for (int k = 0; k < masCercano.numAttributes(); ++k) {
+
+			/*	switch (masCercano.attribute(k).type()) {
+				case Attribute.NUMERIC:
+					m_Counts = null;
+					break;
+				case Attribute.NOMINAL:
+					m_Counts = new double[instances.numClasses()];
+					for (int i = 0; i < m_Counts.length; i++) {
+						m_Counts[i] = 1;
+					}
+					sumOfWeights = instances.numClasses();
+					break;
+				}*/
+			}
+		}
 	}
 
 	/**
@@ -186,7 +255,7 @@ public class ZeroRPracticas extends AbstractClassifier implements
 		double distance = 0;
 
 		for (int i = 0; i < array1.length; ++i) {
-			distance += Math.abs(array2[i] - array1[i]);
+			distance += Math.pow(Math.abs(array2[i] - array1[i]), 2);
 		}
 
 		return distance;
@@ -294,6 +363,55 @@ public class ZeroRPracticas extends AbstractClassifier implements
 	@Override
 	public String getRevision() {
 		return RevisionUtils.extract("$Revision: 10153 $");
+	}
+
+	@Override
+	public Enumeration<Option> listOptions() {
+		Vector<Option> newVector = new Vector<Option>(1);
+
+		newVector.addElement(new Option("\t Number of prototypes \n"
+				+ "\t(use when prototypes > 1)", "I", 0, "-I"));
+		return newVector.elements();
+	}
+
+	@Override
+	public void setOptions(String[] options) {
+		String prototipos;
+		try {
+			prototipos = Utils.getOption('I', options);
+			if (prototipos.length() != 0) {
+				setNumPrototipos(Integer.parseInt(prototipos));
+			} else {
+				setNumPrototipos(1);
+			}
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+
+		}
+	}
+
+	@Override
+	public String[] getOptions() {
+		Vector<String> options = new Vector<String>();
+		options.add("-I");
+		options.add("" + getNumPrototipos());
+
+		Collections.addAll(options, super.getOptions());
+		// TODO
+		return options.toArray(new String[0]);
+	}
+
+	public int getNumPrototipos() {
+		return numPrototipos;
+	}
+
+	public void setNumPrototipos(int numPrototipos) {
+		this.numPrototipos = numPrototipos;
+	}
+
+	public String numPrototiposTipText() {
+		return "Prototipos";
 	}
 
 	/**
