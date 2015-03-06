@@ -169,75 +169,77 @@ public class ZeroRPracticas extends AbstractClassifier implements
 		int filas = instances.numClasses();
 		int columnas = numPrototipos;
 
-		ArrayList<Integer> numProtSeleccionados = new ArrayList<Integer>(filas);
-
-		for (int i = 0; i < filas; ++i) {
-			numProtSeleccionados.add(0);
-		}
-
 		prototipos = new ArrayList<ArrayList<Instance>>(filas);
 
 		for (int i = 0; i < filas; ++i) {
-			prototipos.add(new ArrayList<Instance>(columnas));
+			prototipos.add(new ArrayList<Instance>());
 		}
 
 		Enumeration<Instance> enu = instances.enumerateInstances();
 		Instance instance;
 		Attribute tipoClass;
+		// Enumeracion con los atributos de todas las instancias
+		Enumeration<Object> en;
+
 		// TODO
 		/* No hace falta recorrer todo el set */
-		for (int i = 0; enu.hasMoreElements(); ++i) {
+		for (; enu.hasMoreElements();) {
 			instance = enu.nextElement();
-			tipoClass = instance.classAttribute();
+			en = instances.classAttribute().enumerateValues();
 
-			/*
-			 * if (numProtSeleccionados.get(tipoClass) < numPrototipos) {
-			 * prototipos.get(tipoClass).add(instance); }
-			 */
+			// IMPORTANTE
+			// ===========================================
+			// ===========================================
+			int cosa = instances.classAttribute().numValues();
+			double cosa2 = instance.classValue();
+			// ==========================================
+
+			if (prototipos.get((int) instance.classValue()).size() < columnas) {
+				prototipos.get((int) instance.classValue()).add(instance);
+			}
+
 		}
+
+		entrenaPrototipos(instances);
 
 	}
 
 	public void entrenaPrototipos(Instances instances) {
 		Enumeration<Instance> enu = instances.enumerateInstances();
 		Instance instance;
-		int tipoClass;
 
 		for (int i = 0; enu.hasMoreElements(); ++i) {
 			instance = enu.nextElement();
-			tipoClass = instance.classAttribute().type();
 
 			// Calcular el prototipo mas cercano
-			double distMin = Double.MIN_VALUE;
+			double distMin = Double.MAX_VALUE;
 			double distAct;
 			Instance masCercano = null;
 
-			for (int j = 0; j < numPrototipos; ++j) {
-				distAct = distancia(prototipos.get(tipoClass).get(j), instance);
+			for (int k = 0; k < numPrototipos; ++k) {
+				// TODO
+				// No esta implementado para atributos nominales
+				distAct = distancia(prototipos.get((int) instance.classValue()).get(k), instance);
 
 				if (distAct < distMin) {
 					distMin = distAct;
-					masCercano = prototipos.get(tipoClass).get(j);
+					masCercano = prototipos.get((int) instance.classValue()).get(k);
 				}
 			}
-			// TODO
-			// Comprobar si cambian los valores originales
 
-			for (int k = 0; k < masCercano.numAttributes(); ++k) {
+			double[] valores1 = masCercano.toDoubleArray();
+			double[] valores2 = instance.toDoubleArray();
+			double[] resultado = new double[valores1.length];
 
-			/*	switch (masCercano.attribute(k).type()) {
-				case Attribute.NUMERIC:
-					m_Counts = null;
-					break;
-				case Attribute.NOMINAL:
-					m_Counts = new double[instances.numClasses()];
-					for (int i = 0; i < m_Counts.length; i++) {
-						m_Counts[i] = 1;
-					}
-					sumOfWeights = instances.numClasses();
-					break;
-				}*/
+			for (int k = 0; k < instance.numAttributes()-1; ++k) {
+				resultado[k] = (valores1[k] + valores2[k]) / 2;
 			}
+
+			for (int k = 0; k < instance.numAttributes()-1; ++k) {
+				masCercano.setValue(k, resultado[k]);
+
+			}
+
 		}
 	}
 
@@ -254,7 +256,10 @@ public class ZeroRPracticas extends AbstractClassifier implements
 		double[] array2 = instance2.toDoubleArray();
 		double distance = 0;
 
-		for (int i = 0; i < array1.length; ++i) {
+		for (int i = 0; i < array1.length - 1; ++i) { // -1 para evitar comparar
+														// la distancia que
+														// separa el atributo
+														// clase
 			distance += Math.pow(Math.abs(array2[i] - array1[i]), 2);
 		}
 
@@ -271,7 +276,25 @@ public class ZeroRPracticas extends AbstractClassifier implements
 	@Override
 	public double classifyInstance(Instance instance) {
 
-		return m_ClassValue;
+		double distMin = Double.MAX_VALUE;
+		double distAct;
+		Instance masCercano = null;
+
+		for (int i = 0; i < prototipos.size(); ++i) {
+
+			for (int j = 0; j < numPrototipos; ++j) {
+				// TODO
+				// No esta implementado para atributos nominales
+				distAct = distancia(prototipos.get(i).get(j), instance);
+
+				if (distAct < distMin) {
+					distMin = distAct;
+					masCercano = prototipos.get(i).get(j);
+				}
+			}
+		}
+
+		return masCercano.classValue();
 	}
 
 	/**
@@ -287,13 +310,19 @@ public class ZeroRPracticas extends AbstractClassifier implements
 	@Override
 	public double[] distributionForInstance(Instance instance) throws Exception {
 
-		if (m_Counts == null) {
-			double[] result = new double[1];
-			result[0] = m_ClassValue;
-			return result;
-		} else {
-			return m_Counts.clone();
+		double valorClasf = classifyInstance(instance);
+
+		double[] probabilidades = new double[prototipos.size()];
+
+		for (int i = 0; i < probabilidades.length; ++i) {
+			if (valorClasf == i) {
+				probabilidades[i] = 1;
+			} else {
+				probabilidades[i] = 0;
+			}
 		}
+
+		return probabilidades;
 	}
 
 	/**
