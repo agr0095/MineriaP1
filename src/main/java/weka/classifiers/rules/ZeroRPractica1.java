@@ -1,24 +1,3 @@
-/*
- *   This program is free software: you can redistribute it and/or modify
- *   it under the terms of the GNU General Public License as published by
- *   the Free Software Foundation, either version 3 of the License, or
- *   (at your option) any later version.
- *
- *   This program is distributed in the hope that it will be useful,
- *   but WITHOUT ANY WARRANTY; without even the implied warranty of
- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *   GNU General Public License for more details.
- *
- *   You should have received a copy of the GNU General Public License
- *   along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-/*
- *    ZeroR.java
- *    Copyright (C) 1999-2012 University of Waikato, Hamilton, New Zealand
- *
- */
-
 package weka.classifiers.rules;
 
 import java.util.ArrayList;
@@ -41,8 +20,10 @@ import weka.core.Utils;
 import weka.core.WeightedInstancesHandler;
 
 /**
- * <!-- globalinfo-start --> Class for building and using a 0-R classifier.
- * Predicts the mean (for a numeric class) or the mode (for a nominal class).
+ * <!-- globalinfo-start --> Clasificador basado en prototipos.
+ * <p/>
+ * Funcional unicamente cuando los atributos de las instancias(a excepción del
+ * atributo de clase) son numéricos.
  * <p/>
  * <!-- globalinfo-end -->
  * 
@@ -50,17 +31,19 @@ import weka.core.WeightedInstancesHandler;
  * <p/>
  * 
  * <pre>
- * -D
- *  If set, classifier is run in debug mode and
- *  may output additional info to the console
+ * -I
+ * 
+ *  Indica el número de prototipos (de cada clase) que usaremos en el clasificador.
  * </pre>
  * 
  * <!-- options-end -->
  * 
- * @author Eibe Frank (eibe@cs.waikato.ac.nz)
- * @version $Revision: 10153 $
+ * @author Adrián Arroyo Pérez (aap0065@alu.ubu.es) Alejandro González Rogel
+ *         (agr0095@alu.ubu.es)
+ * 
+ * @version 1.0
  */
-public class ZeroRPracticas extends AbstractClassifier implements
+public class ZeroRPractica1 extends AbstractClassifier implements
 		WeightedInstancesHandler, Sourcable, OptionHandler {
 
 	/** for serialization */
@@ -75,10 +58,14 @@ public class ZeroRPracticas extends AbstractClassifier implements
 	/** The class attribute. */
 	private Attribute m_Class;
 
-	/** Prototipos de cada clase */
+	/**
+	 * Matriz para almacenar todos nuestros prototipos. El número de filas
+	 * corresponde al número de clases existentes en el dataset. El número de
+	 * columnas corresponde al número de prototipos para cada clase.
+	 * */
 	private List<ArrayList<Instance>> prototipos;
 
-	/** Numero de prototipos (parametro) */
+	/** Numero de prototipos de cada posible clase existente en el dataset */
 	private int numPrototipos;
 
 	/**
@@ -124,14 +111,10 @@ public class ZeroRPracticas extends AbstractClassifier implements
 
 	/**
 	 * Crea una serie de prototipos de cada clase a partir de los datos de
-	 * entrenamiento. El numero de prototipos que se creen se introduce como
-	 * parametro.
+	 * entrenamiento. Además, una vez seleccionados los prototipos, se entrenan.
 	 * 
-	 * @param numPrototipos
-	 * @return
-	 */
-	/**
-	 * Generates the classifier.
+	 * El numero de prototipos creados se ha introducido por parámetro en la
+	 * invocación del método main y está almacenado en @numPrototipos.
 	 * 
 	 * @param instances
 	 *            set of instances serving as training data
@@ -140,107 +123,130 @@ public class ZeroRPracticas extends AbstractClassifier implements
 	 */
 	@Override
 	public void buildClassifier(Instances instances) throws Exception {
-		/*
-		 * // can classifier handle the data?
-		 * getCapabilities().testWithFail(instances);
-		 * 
-		 * // remove instances with missing class instances = new
-		 * Instances(instances); instances.deleteWithMissingClass();
-		 * 
-		 * double sumOfWeights = 0;
-		 * 
-		 * m_Class = instances.classAttribute(); m_ClassValue = 0; switch
-		 * (instances.classAttribute().type()) { case Attribute.NUMERIC:
-		 * m_Counts = null; break; case Attribute.NOMINAL: m_Counts = new
-		 * double[instances.numClasses()]; for (int i = 0; i < m_Counts.length;
-		 * i++) { m_Counts[i] = 1; } sumOfWeights = instances.numClasses();
-		 * break; } Enumeration<Instance> enu = instances.enumerateInstances();
-		 * while (enu.hasMoreElements()) { Instance instance =
-		 * enu.nextElement(); if (!instance.classIsMissing()) { if
-		 * (instances.classAttribute().isNominal()) { m_Counts[(int)
-		 * instance.classValue()] += instance.weight(); } else { m_ClassValue +=
-		 * instance.weight() * instance.classValue(); } sumOfWeights +=
-		 * instance.weight(); } } if (instances.classAttribute().isNumeric()) {
-		 * if (Utils.gr(sumOfWeights, 0)) { m_ClassValue /= sumOfWeights; } }
-		 * else { m_ClassValue = Utils.maxIndex(m_Counts);
-		 * Utils.normalize(m_Counts, sumOfWeights); }
-		 */
 
-		int filas = instances.numClasses();
-		int columnas = numPrototipos;
-
-		prototipos = new ArrayList<ArrayList<Instance>>(filas);
-
-		for (int i = 0; i < filas; ++i) {
+		// Inicializamos la matriz que contendrá los prototipos.
+		prototipos = new ArrayList<ArrayList<Instance>>(instances.numClasses());
+		for (int i = 0; i < instances.numClasses(); ++i) {
 			prototipos.add(new ArrayList<Instance>());
 		}
 
 		Enumeration<Instance> enu = instances.enumerateInstances();
 		Instance instance;
-		Attribute tipoClass;
-		// Enumeracion con los atributos de todas las instancias
-		Enumeration<Object> en;
 
 		// TODO
-		/* No hace falta recorrer todo el set */
-		for (; enu.hasMoreElements();) {
+		// Los prototipos de consiguen de manera lineal, no aleatoria
+
+		// Añadimos un prototipo de la clase de la instancia (si podemos)
+		for (; enu.hasMoreElements() && !prototiposCompletos();) {
 			instance = enu.nextElement();
-			en = instances.classAttribute().enumerateValues();
 
-			// IMPORTANTE
-			// ===========================================
-			// ===========================================
-			int cosa = instances.classAttribute().numValues();
-			double cosa2 = instance.classValue();
-			// ==========================================
-
-			if (prototipos.get((int) instance.classValue()).size() < columnas) {
+			if (prototipos.get((int) instance.classValue()).size() < numPrototipos) {
 				prototipos.get((int) instance.classValue()).add(instance);
 			}
 
 		}
 
+		// Si no hemos podido generar correctamente el clasificador, lanzamos un
+		// error
+		if (!enu.hasMoreElements() && prototiposCompletos())
+			throw new Exception("Excepción en la creación del clasificador");
+
 		entrenaPrototipos(instances);
 
 	}
 
+	/**
+	 * Comprueba si hemos almacenado todos los prototipos que se nos pedían.
+	 * 
+	 * @return true si tenemos almacenados todos los prototipos. false si no
+	 *         tenemos todos los prototipos
+	 */
+	private boolean prototiposCompletos() {
+		for (int i = 0; i < prototipos.size(); i++) {
+			if (prototipos.get(i).size() != numPrototipos)
+				return false;
+		}
+		return true;
+	}
+
+	/**
+	 * Entrena nuestro conjunto de prototipos para que se distribuyan por el
+	 * espacio muestral que corresponde a la clase a la que pertenecen.
+	 * 
+	 * @param instances
+	 *            El conjunto total de datos con los que contamos.
+	 */
 	public void entrenaPrototipos(Instances instances) {
+
 		Enumeration<Instance> enu = instances.enumerateInstances();
 		Instance instance;
+		Instance masCercano; // Almacena el prototipo más cercano a la instancia
+								// concreta.
 
-		for (int i = 0; enu.hasMoreElements(); ++i) {
+		// Por cada instancia
+		for (; enu.hasMoreElements();) {
+
 			instance = enu.nextElement();
+			// Calculamos el prototipo más semejante a la instancia
+			masCercano = prototipoMasCercano(instance);
 
-			// Calcular el prototipo mas cercano
-			double distMin = Double.MAX_VALUE;
-			double distAct;
-			Instance masCercano = null;
-
-			for (int k = 0; k < numPrototipos; ++k) {
-				// TODO
-				// No esta implementado para atributos nominales
-				distAct = distancia(prototipos.get((int) instance.classValue()).get(k), instance);
-
-				if (distAct < distMin) {
-					distMin = distAct;
-					masCercano = prototipos.get((int) instance.classValue()).get(k);
-				}
-			}
-
-			double[] valores1 = masCercano.toDoubleArray();
-			double[] valores2 = instance.toDoubleArray();
-			double[] resultado = new double[valores1.length];
-
-			for (int k = 0; k < instance.numAttributes()-1; ++k) {
-				resultado[k] = (valores1[k] + valores2[k]) / 2;
-			}
-
-			for (int k = 0; k < instance.numAttributes()-1; ++k) {
-				masCercano.setValue(k, resultado[k]);
-
-			}
+			// Actualizamos el valor de nuestro prototipo
+			actualizarPrototipo(instance, masCercano);
 
 		}
+	}
+
+	/**
+	 * Actualiza el valor del prototipo pasado por parámetro tomando como
+	 * referencia una instancia también pasada por parámetro
+	 *
+	 * @param instance
+	 *            Instancia con la que actualizaremos el prototipo prototipo
+	 *            Prototipo a actualizar.
+	 *
+	 */
+
+	public void actualizarPrototipo(Instance instance, Instance prototipo) {
+
+		double[] valores1 = prototipo.toDoubleArray();
+		double[] valores2 = instance.toDoubleArray();
+
+		// Actualizamos el prototipo
+		for (int k = 0; k < instance.numAttributes() - 1; ++k) {
+			prototipo.setValue(k, (valores1[k] + valores2[k]) / 2);
+		}
+
+	}
+
+	/**
+	 * Devuelve el prototipo más parecido a la instancia pasada por parámetro.
+	 * Conocemos la clase de la instancia pasada por parámetro.
+	 * 
+	 * @param instance
+	 *            Instancia de la que queremos calcular el prototipo más cercano
+	 * @return prototipo más cercano.
+	 */
+	public Instance prototipoMasCercano(Instance instance) {
+
+		double distMin = Double.MAX_VALUE;
+		double distAct = Double.MAX_VALUE;
+		Instance masCercano = null;
+
+		// Calculamos el prototipo mas cercano
+
+		for (int k = 0; k < numPrototipos; ++k) {
+			// TODO
+			// No esta implementado para atributos nominales
+			distAct = distancia(prototipos.get((int) instance.classValue())
+					.get(k), instance);
+
+			if (distAct < distMin) {
+				distMin = distAct;
+				masCercano = prototipos.get((int) instance.classValue()).get(k);
+			}
+		}
+
+		return masCercano;
 	}
 
 	/**
@@ -295,6 +301,7 @@ public class ZeroRPracticas extends AbstractClassifier implements
 		}
 
 		return masCercano.classValue();
+
 	}
 
 	/**
@@ -310,6 +317,8 @@ public class ZeroRPracticas extends AbstractClassifier implements
 	@Override
 	public double[] distributionForInstance(Instance instance) throws Exception {
 
+		//TODO
+		//ARROYO, dijiste que tenías algo apuntado sobre este método...pues mira a ver que es.
 		double valorClasf = classifyInstance(instance);
 
 		double[] probabilidades = new double[prototipos.size()];
@@ -414,7 +423,6 @@ public class ZeroRPracticas extends AbstractClassifier implements
 				setNumPrototipos(1);
 			}
 		} catch (Exception e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 
 		}
@@ -427,7 +435,6 @@ public class ZeroRPracticas extends AbstractClassifier implements
 		options.add("" + getNumPrototipos());
 
 		Collections.addAll(options, super.getOptions());
-		// TODO
 		return options.toArray(new String[0]);
 	}
 
@@ -450,6 +457,6 @@ public class ZeroRPracticas extends AbstractClassifier implements
 	 *            the options
 	 */
 	public static void main(String[] argv) {
-		runClassifier(new ZeroRPracticas(), argv);
+		runClassifier(new ZeroRPractica1(), argv);
 	}
 }
